@@ -6,12 +6,15 @@
 package SincronizadorCarpetas;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import static java.lang.Thread.sleep;
 import java.util.ArrayList;
 import java.util.Scanner;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import javax.swing.JOptionPane;
 
 /**
  *
@@ -19,24 +22,96 @@ import java.util.logging.Logger;
  */
 public class ComprobarEscribirArchivo {
 
+    private static String origen, destino;
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
+        String continuar = "true";
         try {
-            obtenerCarpetas();
+            while(Boolean.parseBoolean(continuar)){
+                System.out.println(continuar);
+                obtenerOrigenDestino();
+                PreOperacion();
+                //15 minutos
+                sleep(900000);
+                
+                continuar = verificarContinuar();
+            }
+            System.out.println(continuar);
+            
         } catch (IOException ex) {
-            Logger.getLogger(ComprobarEscribirArchivo.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(null, ("error en proceso: " + ex.toString() + " error: 010"), "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (InterruptedException ex) {
+            JOptionPane.showMessageDialog(null, ("error en proceso: " + ex.toString() + " error: 011"), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-
+    
     /**
-     * obtenmos carpetas a comprobar y realizamos operaciones necesarias
-     *
-     * @throws IOException
+     * comprobamos si el archivo de continuaicon permite continuar el proceso
+     * @return 
      */
-    public static void obtenerCarpetas() throws IOException {
-        String ruta = "/home/javier/Escritorio/DAM2";
+    public static String verificarContinuar(){
+        String resultado = "true";
+        File archivo = null;
+        FileReader flujo = null;
+        BufferedReader leer = null;
+        
+        try{
+            archivo = new File("continuar.txt");
+            flujo = new FileReader(archivo);
+            leer = new BufferedReader(flujo);
+            
+            resultado = leer.readLine();
+        } catch (FileNotFoundException ex) {
+            JOptionPane.showMessageDialog(null, ("error al verificar:  " + ex.toString() + " error: 019"), "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(null, ("error al verificar:  " + ex.toString() + " error: 020"), "Error", JOptionPane.ERROR_MESSAGE);
+        } finally {
+            try {
+                flujo.close();
+                leer.close();
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(null, ("error al cerrar verificado:  " + ex.toString() + " error: 020"), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+        
+        return resultado;
+    }
+
+    private static void obtenerOrigenDestino(){
+        File archivo = new File("configuracion.txt");
+        FileReader flujo = null;
+        BufferedReader leer = null;
+        
+        try{
+            flujo = new FileReader(archivo);
+            leer = new BufferedReader(flujo);
+            
+            origen = leer.readLine();
+            destino = leer.readLine();
+            
+        } catch (FileNotFoundException ex) {
+            JOptionPane.showMessageDialog(null, ("error en proceso: " + ex.toString() + " error: 012"), "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(null, ("error en proceso: " + ex.toString() + " error: 013"), "Error", JOptionPane.ERROR_MESSAGE);
+        } finally { 
+            try {
+                flujo.close();
+                leer.close();
+            } catch (IOException ex) {
+               JOptionPane.showMessageDialog(null, ("error en proceso: " + ex.toString() + " error: 014"), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    /**
+     * obtenemos los nombres de todas las carpetas del origen
+     * @return devolvemos un array que es el que contiene los nombres de las carpetas
+     * @throws IOException 
+     */
+    public static ArrayList<String> obtenerCarpetas() throws IOException{
+        String ruta = origen;
         Process p = Runtime.getRuntime().exec("ls -a " + ruta);
         BufferedReader bri = new BufferedReader(new InputStreamReader(p.getInputStream()));
         String tmpLine = "";
@@ -49,6 +124,15 @@ public class ComprobarEscribirArchivo {
             }
         }
         
+        return carpetas;
+    }
+    /**
+     * obtenemos las carpetas de la funcion Carpetas y ejecutamos la funcion operarInformacion
+     * @throws IOException
+     */
+    public static void PreOperacion() throws IOException {
+       ArrayList<String> carpetas = obtenerCarpetas();
+        String ruta = origen;
         
         operarInformacion(comprobarActMasReciente(carpetas, ruta), verUltimaMod(), ruta, carpetas);
     }
@@ -79,12 +163,17 @@ public class ComprobarEscribirArchivo {
                 if (datoRutaA.equals(datoRutaR)) {
                     nuevo = false;
                     if (!datoModA.equals(datoModR)) {
-                        sincronizarDatos(datoRutaR);
+                        try{
+                            sincronizarDatos("/"+carpetas.get(i), false);
+                        } catch(IndexOutOfBoundsException ex){
+                            JOptionPane.showMessageDialog(null, ("error en proceso: " + ex.toString() + " error: 017"), "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                        
                     }
                 } 
             }
             if (nuevo) {
-                sincronizarDatos(datoRutaR);
+                sincronizarDatos("", true);
             }
         }
         almacenarCambios(carpetas, ruta);
@@ -93,12 +182,24 @@ public class ComprobarEscribirArchivo {
 
     /**
      * copiamos los nuevos datos en la ruta de almacenamiento
-     * @param ruta ruta de los datos que hay que guardar
+     * @param carpeta carpeta que vamos a guardar
+     * @param  raiz nos especifica si hay que guardar todas las carpetas del origen
      * @throws IOException 
      */
-    private static void sincronizarDatos(String ruta) throws IOException {
-        String comand = "cp -r " + ruta + " /home/javier/Escritorio/repositorioCopias/"+obtenerNombre(ruta);
-        Process p = Runtime.getRuntime().exec(comand);
+    private static void sincronizarDatos(String carpeta, boolean raiz) throws IOException {
+        String comand = "";
+        if (!raiz) {
+            comand = "cp -r "+ origen+ carpeta + " "+ destino;
+            Process p = Runtime.getRuntime().exec(comand);
+        } else {
+            ArrayList<String> carpetas = obtenerCarpetas();
+            for (int i = 0; i < carpetas.size(); i++) {
+                comand = "cp -r "+ origen+ "/" +carpetas.get(i) + " "+ destino;
+                Process r = Runtime.getRuntime().exec(comand);
+            }
+            
+        }
+        
     }
     
     /**
@@ -113,7 +214,7 @@ public class ComprobarEscribirArchivo {
     }
 
     /**
-     * almacenamos cuando se modificarion por ultima vez los cambios
+     * almacenamos cuando se modificaron por ultima vez los cambios
      *
      * @param carpetas carpetas a comprobar
      * @param ruta ruta de las carpetas

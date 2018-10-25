@@ -5,16 +5,13 @@
  */
 package SincronizadorCarpetas;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.ProcessBuilder.Redirect;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import javax.swing.JOptionPane;
 
 /**
  *
@@ -41,9 +38,9 @@ public class NewMain {
             ejecutarProceso(ComprobarEscribirArchivo.class);
             
         } catch (IOException ex) {
-            Logger.getLogger(NewMain.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(null, ("error al ejecutar proceso: " + ex.toString() + " error: 008"), "Error", JOptionPane.ERROR_MESSAGE);
         } catch (InterruptedException ex) {
-            Logger.getLogger(NewMain.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(null, ("error al ejecutar proceso: " + ex.toString() + " error: 009"), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -59,8 +56,9 @@ public class NewMain {
         ProcessBuilder builder = new ProcessBuilder(javaBin, "-cp", javaPath, javaName);
 
         builder.redirectOutput(new File("datos.txt"));
-        
+        //builder.redirectOutput(Redirect.INHERIT);
         builder.redirectInput(new File("datos.txt"));
+        //builder.redirectError(Redirect.INHERIT);
 
         Process proceso = builder.start();
 
