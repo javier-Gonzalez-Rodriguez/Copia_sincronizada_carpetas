@@ -398,7 +398,6 @@ public class FolderSincronized extends javax.swing.JFrame {
         }
 
     }
-
 }
 
 //ultimo error 22
